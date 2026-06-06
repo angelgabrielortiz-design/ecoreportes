@@ -10,7 +10,7 @@
   :root {
     --verde:#1a5c3a;--verde-claro:#2d8a57;--acento:#c8f04a;--fondo:#0d1f14;--fondo2:#132a1a;
     --texto:#e8f5e0;--texto2:#8fbb7a;--baja:#4ac8f0;--media:#f0c84a;--alta:#f04a4a;
-    --borde:#2a4a32;--pendiente:#f0c84a;--terminado:#4ac87a;--nuevo:#a78bfa;
+    --borde:#2a4a32;--terminado:#4ac87a;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Syne',sans-serif;background:var(--fondo);color:var(--texto);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
@@ -52,8 +52,7 @@
   .badge-prio.media{background:rgba(240,200,74,0.15);color:var(--media);}
   .badge-prio.baja{background:rgba(74,200,240,0.15);color:var(--baja);}
   .badge-est{font-family:'Space Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;text-transform:uppercase;}
-  .badge-est.nuevo{background:rgba(167,139,250,0.15);color:var(--nuevo);}
-  .badge-est.pendiente{background:rgba(240,200,74,0.15);color:var(--pendiente);}
+  .badge-est.pendiente{background:rgba(240,200,74,0.15);color:var(--media);}
   .badge-est.terminado{background:rgba(74,200,122,0.15);color:var(--terminado);}
   .card-desc{font-size:11px;color:var(--texto2);line-height:1.4;margin-bottom:6px;}
   .card-coords{font-family:'Space Mono',monospace;font-size:9px;color:var(--verde-claro);margin-bottom:8px;}
@@ -61,10 +60,8 @@
   .btn-accion{font-family:'Syne',sans-serif;font-size:11px;font-weight:600;padding:5px 10px;border-radius:5px;cursor:pointer;transition:all 0.2s;}
   .btn-ver{background:transparent;border:1px solid var(--borde);color:var(--texto2);}
   .btn-ver:hover{border-color:var(--acento);color:var(--acento);}
-  .btn-iniciar{background:rgba(167,139,250,0.15);color:var(--nuevo);border:1px solid var(--nuevo);}
-  .btn-iniciar:hover{background:var(--nuevo);color:var(--fondo);}
-  .btn-finalizar{background:rgba(240,200,74,0.15);color:var(--pendiente);border:1px solid var(--pendiente);}
-  .btn-finalizar:hover{background:var(--pendiente);color:var(--fondo);}
+  .btn-resolver{background:rgba(240,200,74,0.15);color:var(--media);border:1px solid var(--media);}
+  .btn-resolver:hover{background:var(--media);color:var(--fondo);}
   .btn-reabrir{background:rgba(74,200,122,0.15);color:var(--terminado);border:1px solid var(--terminado);}
   .btn-reabrir:hover{background:var(--terminado);color:var(--fondo);}
   #map{flex:1;}
@@ -93,7 +90,7 @@
     <div class="logo-icon">🌿</div>
     <div class="logo-text">Eco<span>Reportes</span></div>
   </div>
-  <div style="display:flex;align-items:center;gap:16px;">
+  <div class="header-right" style="display:flex;align-items:center;gap:16px;">
     <span class="badge">PANEL MUNICIPAL</span>
     <button id="btn-actualizar" onclick="cargarDatos()">↻ Actualizar</button>
   </div>
@@ -111,8 +108,7 @@
     </div>
     <div class="filtros">
       <button class="filtro-btn active" onclick="filtrar('todos',this)">Todos</button>
-      <button class="filtro-btn" onclick="filtrar('nuevo',this)">Nuevos</button>
-      <button class="filtro-btn" onclick="filtrar('pendiente',this)">En proceso</button>
+      <button class="filtro-btn" onclick="filtrar('pendiente',this)">Pendientes</button>
       <button class="filtro-btn" onclick="filtrar('terminado',this)">Resueltos</button>
       <button class="filtro-btn" onclick="filtrar('alta',this)">🔴 Alta</button>
     </div>
@@ -125,28 +121,16 @@
 const API = 'https://script.google.com/macros/s/AKfycbxvzlJ-DnYt0LudQ40xtIxwj7n2me7JPuG_T6rK3fGTBIgt4ylS9UX0XKpBU_bMvAYl/exec';
 let mapa, reportes=[], markers=[], filtroActual='todos';
 
-mapa = L.map('map',{zoomControl:false}).setView([20.45,-101.53],13);
+mapa = L.map('map',{zoomControl:false}).setView([20.5,-100.5],10);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(mapa);
 L.control.zoom({position:'bottomright'}).addTo(mapa);
 
 function getPrio(p){ if(!p) return 'baja'; p=p.toLowerCase(); if(p.includes('alta')) return 'alta'; if(p.includes('media')) return 'media'; return 'baja'; }
 function getColor(p){ if(p==='alta') return '#f04a4a'; if(p==='media') return '#f0c84a'; return '#4ac8f0'; }
-
-function getEst(r){
-  const e=(r.estado||'').toString().toLowerCase().trim();
-  if(e==='terminado') return 'terminado';
-  if(e==='pendiente') return 'pendiente';
-  return 'nuevo';
-}
-
-function iconoColor(p,est){
-  if(est==='terminado') return '#4ac87a';
-  if(est==='pendiente') return '#f0c84a';
-  return getColor(p);
-}
+function getEst(r){ return String(r.estado||'').toLowerCase().includes('terminado')?'terminado':'pendiente'; }
 
 function icono(p,est){
-  const c=iconoColor(p,est);
+  const c=est==='terminado'?'#4ac87a':getColor(p);
   const s=est==='terminado'?10:14;
   return L.divIcon({html:`<div style="width:${s}px;height:${s}px;background:${c};border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px ${c}88"></div>`,className:'',iconSize:[s,s],iconAnchor:[s/2,s/2]});
 }
@@ -157,8 +141,7 @@ async function cambiarEstado(fecha,nuevoEstado,idx){
   try{
     fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha:String(fecha),estado:nuevoEstado})});
     reportes[idx].estado=nuevoEstado;
-    const msgs={Pendiente:'▶ Reporte iniciado',Terminado:'✓ Reporte finalizado'};
-    toast(msgs[nuevoEstado]||'Actualizado');
+    toast(nuevoEstado==='Terminado'?'✓ Marcado como resuelto':'↺ Reabierto');
     actualizarStats();
     aplicarFiltro();
   } catch(e){ toast('Error al actualizar'); }
@@ -169,21 +152,6 @@ function actualizarStats(){
   document.getElementById('cnt-media').textContent=reportes.filter(r=>getPrio(r.prioridad)==='media').length;
   document.getElementById('cnt-baja').textContent=reportes.filter(r=>getPrio(r.prioridad)==='baja').length;
   document.getElementById('cnt-term').textContent=reportes.filter(r=>getEst(r)==='terminado').length;
-}
-
-function btnEstado(r,idx,popup=false){
-  const est=getEst(r);
-  const cls=popup?'p-btn':'btn-accion';
-  if(est==='nuevo'){
-    const style=popup?'background:#a78bfa22;color:#a78bfa;border:1px solid #a78bfa':'';
-    return `<button class="${cls} btn-iniciar" style="${style}" onclick="cambiarEstado('${r.fecha}','Pendiente',${idx})${popup?';mapa.closePopup()':''}">▶ Iniciar</button>`;
-  }
-  if(est==='pendiente'){
-    const style=popup?'background:#f0c84a22;color:#f0c84a;border:1px solid #f0c84a':'';
-    return `<button class="${cls} btn-finalizar" style="${style}" onclick="cambiarEstado('${r.fecha}','Terminado',${idx})${popup?';mapa.closePopup()':''}">✓ Finalizar</button>`;
-  }
-  const style=popup?'background:#4ac87a22;color:#4ac87a;border:1px solid #4ac87a':'';
-  return `<button class="${cls} btn-reabrir" style="${style}" onclick="cambiarEstado('${r.fecha}','Pendiente',${idx})${popup?';mapa.closePopup()':''}">↺ Reabrir</button>`;
 }
 
 function renderLista(datos){
@@ -200,14 +168,16 @@ function renderLista(datos){
         <div class="card-tipo">${r.tipo||'Sin tipo'}</div>
         <div class="card-badges">
           <span class="badge-prio ${p}">${r.prioridad||'Baja'}</span>
-          <span class="badge-est ${est}">${est==='nuevo'?'nuevo':est==='pendiente'?'en proceso':'resuelto'}</span>
+          <span class="badge-est ${est}">${est}</span>
         </div>
       </div>
       <div class="card-desc">${r.descripcion||'Sin descripción'}</div>
       ${ok?`<div class="card-coords">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>`:''}
       <div class="card-actions">
         ${ok?`<button class="btn-accion btn-ver" onclick="irA(${idx})">📍 Ver</button>`:''}
-        ${btnEstado(r,idx)}
+        ${est==='pendiente'
+          ?`<button class="btn-accion btn-resolver" onclick="cambiarEstado('${r.fecha}','Terminado',${idx})">✓ Resolver</button>`
+          :`<button class="btn-accion btn-reabrir" onclick="cambiarEstado('${r.fecha}','Pendiente',${idx})">↺ Reabrir</button>`}
       </div>
     </div>`;
   }).join('');
@@ -222,17 +192,19 @@ function renderMapa(datos){
     const lat=parseFloat(r.latitud), lng=parseFloat(r.longitud);
     if(isNaN(lat)||isNaN(lng)) return;
     const p=getPrio(r.prioridad), est=getEst(r);
-    const c=iconoColor(p,est);
+    const c=est==='terminado'?'#4ac87a':getColor(p);
     const m=L.marker([lat,lng],{icon:icono(p,est)});
     m.bindPopup(`
       <div class="p-tipo">${r.tipo||'Sin tipo'}</div>
       <div class="p-row"><strong>Descripción:</strong> ${r.descripcion||'—'}</div>
       <div class="p-badges">
         <span class="p-badge" style="background:${getColor(p)}22;color:${getColor(p)}">${r.prioridad||'Baja'}</span>
-        <span class="p-badge" style="background:${c}22;color:${c}">${est==='nuevo'?'nuevo':est==='pendiente'?'en proceso':'resuelto'}</span>
+        <span class="p-badge" style="background:${c}22;color:${c}">${est}</span>
       </div>
       <div class="p-row"><strong>Coords:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-      ${btnEstado(r,idx,true)}
+      ${est==='pendiente'
+        ?`<button class="p-btn" style="background:#f0c84a22;color:#f0c84a;border:1px solid #f0c84a" onclick="cambiarEstado('${r.fecha}','Terminado',${idx});mapa.closePopup()">✓ Marcar resuelto</button>`
+        :`<button class="p-btn" style="background:#4ac87a22;color:#4ac87a;border:1px solid #4ac87a" onclick="cambiarEstado('${r.fecha}','Pendiente',${idx});mapa.closePopup()">↺ Reabrir</button>`}
     `);
     m.addTo(mapa);
     markers[idx]=m;
@@ -243,8 +215,7 @@ function renderMapa(datos){
 
 function aplicarFiltro(){
   let f=reportes.filter(r=>r.tipo||r.descripcion);
-  if(filtroActual==='nuevo') f=f.filter(r=>getEst(r)==='nuevo');
-  else if(filtroActual==='pendiente') f=f.filter(r=>getEst(r)==='pendiente');
+  if(filtroActual==='pendiente') f=f.filter(r=>getEst(r)==='pendiente');
   else if(filtroActual==='terminado') f=f.filter(r=>getEst(r)==='terminado');
   else if(filtroActual==='alta') f=f.filter(r=>getPrio(r.prioridad)==='alta');
   renderLista(f);
