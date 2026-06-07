@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoReportes — Panel Municipal</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --verde: #1a5c3a; --verde-claro: #2d8a57; --acento: #c8f04a; --fondo: #0d1f14; --fondo2: #132a1a;
+    --texto: #e8f5e0; --texto2: #8fbb7a; --baja: #4ac8f0; --media: #f0c84a; --alta: #f04a4a;
+    --borde: #2a4a32; --pendiente: #f0a020; --terminado: #4ac880;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Syne', sans-serif; background: var(--fondo); color: var(--texto); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { background: var(--fondo2); border-bottom: 1px solid var(--borde); padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 1000; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: var(--acento); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo-text { font-size: 18px; font-weight: 800; color: var(--texto); letter-spacing: -0.5px; }
+  .logo-text span { color: var(--acento); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .badge { font-family: 'Space Mono', monospace; font-size: 11px; background: var(--verde); color: var(--acento); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--acento); letter-spacing: 1px; }
+  #btn-actualizar { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; background: var(--acento); color: var(--fondo); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+  #btn-actualizar:hover { opacity: 0.85; }
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .sidebar { width: 340px; background: var(--fondo2); border-right: 1px solid var(--borde); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+  .sidebar-header { padding: 16px 20px; border-bottom: 1px solid var(--borde); }
+  .sidebar-title { font-size: 13px; font-weight: 600; color: var(--texto2); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+  .stat { background: var(--fondo); border-radius: 8px; padding: 8px; text-align: center; border: 1px solid var(--borde); }
+  .stat-num { font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 9px; color: var(--texto2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat.alta .stat-num { color: var(--alta); }
+  .stat.media .stat-num { color: var(--media); }
+  .stat.baja .stat-num { color: var(--baja); }
+  .stat.resueltos .stat-num { color: var(--terminado); }
+  .filtros { padding: 12px 20px; border-bottom: 1px solid var(--borde); display: flex; gap: 6px; flex-wrap: wrap; }
+  .filtro-btn { font-family: 'Space Mono', monospace; font-size: 10px; padding: 5px 10px; border-radius: 4px; border: 1px solid var(--borde); background: transparent; color: var(--texto2); cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px; }
+  .filtro-btn.active, .filtro-btn:hover { background: var(--verde); color: var(--acento); border-color: var(--acento); }
+  .lista-reportes { flex: 1; overflow-y: auto; padding: 8px; }
+  .lista-reportes::-webkit-scrollbar { width: 4px; }
+  .lista-reportes::-webkit-scrollbar-track { background: transparent; }
+  .lista-reportes::-webkit-scrollbar-thumb { background: var(--borde); border-radius: 2px; }
+  .reporte-card { background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 12px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+  .reporte-card:hover { border-color: var(--verde-claro); transform: translateX(2px); }
+  .reporte-card.alta { border-left-color: var(--alta); }
+  .reporte-card.media { border-left-color: var(--media); }
+  .reporte-card.baja { border-left-color: var(--baja); }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .card-tipo { font-size: 12px; font-weight: 600; color: var(--texto); }
+  .card-prioridad { font-family: 'Space Mono', monospace; font-size: 9px; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card-prioridad.alta { background: rgba(240,74,74,0.15); color: var(--alta); }
+  .card-prioridad.media { background: rgba(240,200,74,0.15); color: var(--media); }
+  .card-prioridad.baja { background: rgba(74,200,240,0.15); color: var(--baja); }
+  .card-desc { font-size: 11px; color: var(--texto2); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-coords { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--verde-claro); margin-top: 6px; }
+  .card-estado { font-family: 'Space Mono', monospace; font-size: 9px; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; display: inline-block; }
+  .card-estado.pendiente { background: rgba(240,160,32,0.15); color: var(--pendiente); }
+  .card-estado.terminado { background: rgba(74,200,128,0.15); color: var(--terminado); }
+  .card-estado.nuevo { background: rgba(200,240,74,0.1); color: var(--acento); }
+  .card-acciones { display: flex; gap: 6px; margin-top: 10px; }
+  .btn-accion { font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; padding: 5px 10px; border-radius: 5px; border: 1px solid; cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px; flex: 1; text-align: center; }
+  .btn-accion:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-iniciar { background: rgba(240,160,32,0.12); color: var(--pendiente); border-color: var(--pendiente); }
+  .btn-iniciar:hover:not(:disabled) { background: var(--pendiente); color: var(--fondo); }
+  .btn-finalizar { background: rgba(74,200,128,0.12); color: var(--terminado); border-color: var(--terminado); }
+  .btn-finalizar:hover:not(:disabled) { background: var(--terminado); color: var(--fondo); }
+  .btn-reabrir { background: rgba(240,74,74,0.12); color: var(--alta); border-color: var(--alta); }
+  .btn-reabrir:hover:not(:disabled) { background: var(--alta); color: var(--fondo); }
+  .btn-accion.cargando { opacity: 0.6; cursor: wait; pointer-events: none; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--fondo2); border: 1px solid var(--borde); border-radius: 8px; padding: 12px 20px; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--texto); z-index: 9999; transition: transform 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.ok { border-color: var(--terminado); color: var(--terminado); }
+  #toast.error { border-color: var(--alta); color: var(--alta); }
+  #toast.info { border-color: var(--pendiente); color: var(--pendiente); }
+  #map { flex: 1; background: var(--fondo); }
+  .leaflet-container { background: #0d1f14 !important; }
+  .leaflet-popup-content-wrapper { background: var(--fondo2) !important; border: 1px solid var(--borde) !important; border-radius: 10px !important; color: var(--texto) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; min-width: 220px; }
+  .leaflet-popup-tip { background: var(--fondo2) !important; }
+  .popup-tipo { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: var(--acento); }
+  .popup-row { font-size: 12px; margin-bottom: 4px; color: var(--texto2); }
+  .popup-row strong { color: var(--texto); }
+  .popup-prioridad { display: inline-block; font-family: 'Space Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 4px; margin-top: 6px; text-transform: uppercase; }
+  .popup-estado { font-family: 'Space Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; display: inline-block; margin-left: 6px; }
+  .popup-estado.pendiente { background: rgba(240,160,32,0.2); color: var(--pendiente); }
+  .popup-estado.terminado { background: rgba(74,200,128,0.2); color: var(--terminado); }
+  .popup-estado.nuevo { background: rgba(200,240,74,0.1); color: var(--acento); }
+  #loading { position: fixed; inset: 0; background: var(--fondo); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--borde); border-top-color: var(--acento); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--texto2); letter-spacing: 1px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--texto2); }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><p>CARGANDO REPORTES...</p></div>
+<div id="toast"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌿</div>
+    <div class="logo-text">Eco<span>Reportes</span></div>
+  </div>
+  <div class="header-right">
+    <span class="badge">PANEL MUNICIPAL</span>
+    <button id="btn-actualizar" onclick="cargarDatos()">↻ Actualizar</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Resumen</div>
+      <div class="stats">
+        <div class="stat alta"><div class="stat-num" id="cnt-alta">0</div><div class="stat-label">Alta</div></div>
+        <div class="stat media"><div class="stat-num" id="cnt-media">0</div><div class="stat-label">Media</div></div>
+        <div class="stat baja"><div class="stat-num" id="cnt-baja">0</div><div class="stat-label">Baja</div></div>
+        <div class="stat resueltos"><div class="stat-num" id="cnt-term">0</div><div class="stat-label">Resueltos</div></div>
+      </div>
+    </div>
+    <div class="filtros">
+      <button class="filtro-btn active" onclick="filtrar('todos', this)">Todos</button>
+      <button class="filtro-btn" onclick="filtrar('nuevo', this)">● Nuevos</button>
+      <button class="filtro-btn" onclick="filtrar('pendiente', this)">⏳ En proceso</button>
+      <button class="filtro-btn" onclick="filtrar('terminado', this)">✓ Resueltos</button>
+      <button class="filtro-btn" onclick="filtrar('Alta', this)">🔴 Alta</button>
+    </div>
+    <div class="lista-reportes" id="lista"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwT0-hGPxgQsv5JwCz9VyMfhLlEk4bVzn-glq3Px0_g2NbdH-QTUAh09HTELf8jQb7f/exec';
+  const COL_ESTADO = 'estado';
+  const COL_ID     = 'id';
+
+  let mapa, reportes = [], markers = [], filtroActual = 'todos';
+
+  mapa = L.map('map', { zoomControl: false }).setView([20.45, -101.53], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
+  }).addTo(mapa);
+  L.control.zoom({ position: 'bottomright' }).addTo(mapa);
+
+  function getPrioridad(p) {
+    if (!p) return 'baja';
+    p = p.toLowerCase();
+    if (p.includes('alta')) return 'alta';
+    if (p.includes('media')) return 'media';
+    return 'baja';
+  }
+
+  function getEstado(e) {
+    if (!e) return 'nuevo';
+    e = e.toLowerCase().trim();
+    if (e.includes('terminado') || e.includes('completado') || e.includes('finalizado')) return 'terminado';
+    if (e.includes('pendiente') || e.includes('iniciado') || e.includes('proceso')) return 'pendiente';
+    return 'nuevo';
+  }
+
+  function getEstadoLabel(e) {
+    const s = getEstado(e);
+    if (s === 'terminado') return '✓ Terminado';
+    if (s === 'pendiente') return '⏳ En proceso';
+    return '● Nuevo';
+  }
+
+  function getColor(p) {
+    if (p === 'alta') return '#f04a4a';
+    if (p === 'media') return '#f0c84a';
+    return '#4ac8f0';
+  }
+
+  function crearIcono(prioridad, estadoVal) {
+    const color = getColor(prioridad);
+    const est   = getEstado(estadoVal);
+    const ring  = est === 'terminado' ? '#4ac880' : est === 'pendiente' ? '#f0a020' : 'white';
+    return L.divIcon({
+      html: `<div style="width:14px;height:14px;background:${color};border:2px solid ${ring};border-radius:50%;box-shadow:0 0 8px ${color}88;"></div>`,
+      className: '', iconSize: [14, 14], iconAnchor: [7, 7]
+    });
+  }
+
+  let toastTimer;
+  function mostrarToast(msg, tipo = 'ok') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${tipo}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  async function actualizarEstado(reporte, nuevoEstado, btns) {
+    btns.forEach(b => { b.classList.add('cargando'); b.dataset.orig = b.textContent; b.textContent = '...'; });
+    try {
+      const rowId = reporte._rowIndex;
+      const params = new URLSearchParams({ action: 'updateEstado', rowId, colId: COL_ID, colEstado: COL_ESTADO, estado: nuevoEstado });
+      const res  = await fetch(`${SCRIPT_URL}?${params}`);
+      const data = await res.json();
+      if (data.success) {
+        reporte[COL_ESTADO] = nuevoEstado;
+        const msgs = { Pendiente: '⏳ Iniciado — en proceso', Terminado: '✅ Marcado como terminado' };
+        mostrarToast(msgs[nuevoEstado] || 'Actualizado', nuevoEstado === 'Terminado' ? 'ok' : 'info');
+        actualizarStats(reportes);
+        renderLista(reportesFiltrados());
+        renderMapa(reportesFiltrados());
+      } else {
+        throw new Error(data.error || 'Error desconocido');
+      }
+    } catch (err) {
+      mostrarToast(`❌ ${err.message}`, 'error');
+      btns.forEach(b => { b.textContent = b.dataset.orig; });
+    } finally {
+      btns.forEach(b => b.classList.remove('cargando'));
+    }
+  }
+
+  function reportesFiltrados() {
+    if (filtroActual === 'todos') return reportes;
+    if (['nuevo', 'pendiente', 'terminado'].includes(filtroActual))
+      return reportes.filter(r => getEstado(r[COL_ESTADO]) === filtroActual);
+    return reportes.filter(r =>
+      r.tipo?.toLowerCase().includes(filtroActual.toLowerCase()) ||
+      r.prioridad?.toLowerCase().includes(filtroActual.toLowerCase())
+    );
+  }
+
+  function filtrar(tipo, btn) {
+    filtroActual = tipo;
+    document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderLista(reportesFiltrados());
+    renderMapa(reportesFiltrados());
+  }
+
+  function renderLista(datos) {
+    const lista = document.getElementById('lista');
+    if (!datos.length) {
+      lista.innerHTML = `<div class="empty-state"><div class="icon">📍</div><p>No hay reportes</p></div>`;
+      return;
+    }
+    lista.innerHTML = '';
+    datos.forEach(r => {
+      const p   = getPrioridad(r.prioridad);
+      const est = getEstado(r[COL_ESTADO]);
+      const lat = parseFloat(r.latitud), lng = parseFloat(r.longitud);
+      const ok  = !isNaN(lat) && !isNaN(lng);
+
+      const card = document.createElement('div');
+      card.className = `reporte-card ${p}`;
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="card-tipo">${r.tipo || 'Sin tipo'}</div>
+          <span class="card-prioridad ${p}">${r.prioridad || 'Baja'}</span>
+        </div>
+        <div class="card-desc">${r.descripcion || 'Sin descripción'}</div>
+        ${ok ? `<div class="card-coords">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>` : ''}
+        <span class="card-estado ${est}">${getEstadoLabel(r[COL_ESTADO])}</span>
+        <div class="card-acciones">
+          ${est === 'nuevo'     ? `<button class="btn-accion btn-iniciar">▶ Iniciar</button>` : ''}
+          ${est === 'pendiente' ? `<button class="btn-accion btn-finalizar">✓ Finalizar</button><button class="btn-accion btn-reabrir">↺ Reabrir</button>` : ''}
+          ${est === 'terminado' ? `<button class="btn-accion btn-reabrir">↺ Reabrir</button>` : ''}
+        </div>`;
+
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('btn-accion')) return;
+        if (ok) { const idx = reportes.indexOf(r); mapa.setView([lat, lng], 16); markers[idx]?.openPopup(); }
+      });
+
+      const btnI = card.querySelector('.btn-iniciar');
+      const btnF = card.querySelector('.btn-finalizar');
+      const btnR = card.querySelector('.btn-reabrir');
+
+      if (btnI) btnI.addEventListener('click', e => { e.stopPropagation(); actualizarEstado(r, 'Pendiente', [btnI]); });
+      if (btnF) btnF.addEventListener('click', e => { e.stopPropagation(); actualizarEstado(r, 'Terminado', [btnF]); });
+      if (btnR) btnR.addEventListener('click', e => { e.stopPropagation(); actualizarEstado(r, 'Pendiente', [btnR]); });
+
+      lista.appendChild(card);
+    });
+  }
+
+  function renderMapa(datos) {
+    markers.forEach(m => m && mapa.removeLayer(m));
+    markers = [];
+    const bounds = [];
+
+    reportes.forEach(r => {
+      const lat = parseFloat(r.latitud), lng = parseFloat(r.longitud);
+      if (isNaN(lat) || isNaN(lng)) { markers.push(null); return; }
+
+      const p   = getPrioridad(r.prioridad);
+      const est = getEstado(r[COL_ESTADO]);
+      const marker = L.marker([lat, lng], { icon: crearIcono(p, r[COL_ESTADO]) });
+
+      marker.bindPopup(`
+        <div class="popup-tipo">${r.tipo || 'Sin tipo'}</div>
+        <div class="popup-row"><strong>Descripción:</strong> ${r.descripcion || '—'}</div>
+        <div class="popup-row"><strong>Coords:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+        <div style="margin-top:8px;">
+          <span class="popup-prioridad ${p}" style="background:${getColor(p)}22;color:${getColor(p)}">${r.prioridad || 'Baja'}</span>
+          <span class="popup-estado ${est}">${getEstadoLabel(r[COL_ESTADO])}</span>
+        </div>`);
+
+      if (datos.includes(r)) { marker.addTo(mapa); bounds.push([lat, lng]); }
+      markers.push(marker);
+    });
+
+    if (bounds.length) mapa.fitBounds(bounds, { padding: [40, 40] });
+  }
+
+  function actualizarStats(datos) {
+    document.getElementById('cnt-alta').textContent  = datos.filter(r => getPrioridad(r.prioridad) === 'alta').length;
+    document.getElementById('cnt-media').textContent = datos.filter(r => getPrioridad(r.prioridad) === 'media').length;
+    document.getElementById('cnt-baja').textContent  = datos.filter(r => getPrioridad(r.prioridad) === 'baja').length;
+    document.getElementById('cnt-term').textContent  = datos.filter(r => getEstado(r[COL_ESTADO]) === 'terminado').length;
+  }
+
+  async function cargarDatos() {
+    try {
+      document.getElementById('btn-actualizar').textContent = '↻ Cargando...';
+      const res  = await fetch(`${SCRIPT_URL}?action=getData&t=${Date.now()}`);
+      const data = await res.json();
+      reportes = Array.isArray(data) ? data.filter(r => r.tipo || r.descripcion) : [];
+      reportes.forEach((r, i) => r._rowIndex = i + 2);
+      actualizarStats(reportes);
+      renderLista(reportesFiltrados());
+      renderMapa(reportesFiltrados());
+    } catch (e) {
+      document.getElementById('lista').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar datos</p></div>`;
+    } finally {
+      document.getElementById('btn-actualizar').textContent = '↻ Actualizar';
+      document.getElementById('loading').style.display = 'none';
+    }
+  }
+
+  setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 6000);
+  window.addEventListener('error', () => { document.getElementById('loading').style.display = 'none'; });
+
+  cargarDatos();
+</script>
+</body>
+</html>
