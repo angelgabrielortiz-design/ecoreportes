@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoReportes — Panel Municipal</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --verde: #1a5c3a;
+    --verde-claro: #2d8a57;
+    --acento: #c8f04a;
+    --fondo: #0d1f14;
+    --fondo2: #132a1a;
+    --texto: #e8f5e0;
+    --texto2: #8fbb7a;
+    --baja: #4ac8f0;
+    --media: #f0c84a;
+    --alta: #f04a4a;
+    --borde: #2a4a32;
+    --pendiente: #f0a020;
+    --terminado: #4ac880;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Syne', sans-serif; background: var(--fondo); color: var(--texto); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* (Mantengo tu CSS original completo - solo agrego esto al final) */
+  .btn-accion.cargando { opacity: 0.6; cursor: wait; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><p>CARGANDO REPORTES...</p></div>
+<div id="toast"></div>
+
+<!-- MODAL CONFIGURACIÓN (sin cambios mayores) -->
+<div class="modal-overlay" id="modal-config">
+  <div class="modal-box">
+    <div class="modal-title">⚙️ Configurar EcoReportes</div>
+    <div class="modal-sub">Para que los botones funcionen necesitas el Apps Script desplegado.</div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="cambiarTab('paso1', this)">1. Apps Script</button>
+      <button class="tab-btn" onclick="cambiarTab('paso2', this)">2. URL & Columnas</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-paso1">
+      <div class="steps-list">
+        <div class="step"><b>1.</b> Abre tu Google Sheet → <code>Extensiones → Apps Script</code></div>
+        <div class="step"><b>2.</b> Borra todo y pega el código de abajo</div>
+        <div class="step"><b>3.</b> Guarda y <b>Implementar → Nueva implementación</b></div>
+        <div class="step"><b>4.</b> Tipo: <b>Aplicación web</b> | Ejecutar como: <b>Yo</b> | Acceso: <b>Cualquier persona</b></div>
+      </div>
+
+      <div class="code-block-wrap">
+        <button class="btn-copiar" onclick="copiarScript()">⎘ Copiar</button>
+        <div class="code-block" id="codigo-script">// ══════════════════════════════════════════════
+//  EcoReportes — Apps Script (VERSIÓN MEJORADA)
+// ══════════════════════════════════════════════
+
+var SHEET_NAME = "Hoja1";
+
+function doGet(e) { return manejarPeticion(e); }
+function doPost(e) { return manejarPeticion(e); }
+
+function manejarPeticion(e) {
+  try {
+    var params = e.parameter;
+    if (params.action === "updateEstado") {
+      return respuesta(actualizarEstado(params));
+    }
+    return respuesta({ success: false, error: "Acción desconocida" });
+  } catch (err) {
+    return respuesta({ success: false, error: err.message });
+  }
+}
+
+function respuesta(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function actualizarEstado(params) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) return { success: false, error: "Hoja no encontrada" };
+
+  var rowId = params.rowId;
+  var colId = params.colId || "id";
+  var colEstado = params.colEstado || "estado";
+  var nuevoEstado = params.estado;
+
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(h => h.toString().toLowerCase().trim());
+
+  // Buscar o crear columna de estado
+  var idxEstado = headers.indexOf(colEstado.toLowerCase().trim());
+  if (idxEstado === -1) {
+    idxEstado = headers.length;
+    sheet.getRange(1, idxEstado + 1).setValue(colEstado);
+  }
+
+  var targetRow = -1;
+
+  // Buscar por columna ID
+  if (colId && colId !== "id") {
+    var idxId = headers.indexOf(colId.toLowerCase().trim());
+    if (idxId !== -1) {
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][idxId]).trim() === String(rowId).trim()) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  // Fallback: usar número de fila
+  if (targetRow === -1) {
+    var rowNum = parseInt(rowId);
+    if (!isNaN(rowNum) && rowNum >= 2) targetRow = rowNum;
+  }
+
+  if (targetRow === -1) return { success: false, error: "Fila no encontrada: " + rowId };
+
+  sheet.getRange(targetRow, idxEstado + 1).setValue(nuevoEstado);
+  
+  return { 
+    success: true, 
+    row: targetRow, 
+    estado: nuevoEstado,
+    timestamp: new Date().toISOString()
+  };
+}</div>
+      </div>
+
+      <div class="config-btns">
+        <button class="btn-modal-ok" onclick="cambiarTab('paso2', document.querySelectorAll('.tab-btn')[1])">Siguiente →</button>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-paso2">
+      <div class="config-field">
+        <label class="config-label">URL del Apps Script</label>
+        <input class="config-input" id="input-script-url" placeholder="https://script.google.com/macros/s/.../exec"/>
+      </div>
+      <div class="config-field">
+        <label class="config-label">Columna Estado</label>
+        <input class="config-input" id="input-col-estado" value="estado"/>
+      </div>
+      <div class="config-field">
+        <label class="config-label">Columna ID (o "id" si no tienes)</label>
+        <input class="config-input" id="input-col-id" value="id"/>
+      </div>
+      <div class="config-btns">
+        <button class="btn-modal-ok" onclick="guardarConfig()">✓ Guardar y Activar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resto de tu HTML (header, sidebar, etc.) se mantiene igual -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌿</div>
+    <div class="logo-text">Eco<span>Reportes</span></div>
+  </div>
+  <div class="header-right">
+    <span id="modo-indicator" class="modo-badge lectura">Solo lectura</span>
+    <span class="badge">PANEL MUNICIPAL</span>
+    <button id="btn-config" onclick="abrirConfig()">⚙ Config</button>
+    <button id="btn-actualizar" onclick="cargarDatos()">↻ Actualizar</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Resumen</div>
+      <div class="stats">
+        <div class="stat alta"><div class="stat-num" id="cnt-alta">0</div><div class="stat-label">Alta</div></div>
+        <div class="stat media"><div class="stat-num" id="cnt-media">0</div><div class="stat-label">Media</div></div>
+        <div class="stat baja"><div class="stat-num" id="cnt-baja">0</div><div class="stat-label">Baja</div></div>
+      </div>
+    </div>
+    <div class="filtros">
+      <button class="filtro-btn active" onclick="filtrar('todos', this)">Todos</button>
+      <button class="filtro-btn" onclick="filtrar('Alcantarilla tapada', this)">Alcantarilla</button>
+      <button class="filtro-btn" onclick="filtrar('Centro de acopio lleno', this)">Acopio</button>
+      <button class="filtro-btn" onclick="filtrar('Alta', this)">🔴 Alta</button>
+      <button class="filtro-btn" onclick="filtrar('pendiente', this)">🟡 Pendiente</button>
+      <button class="filtro-btn" onclick="filtrar('terminado', this)">🟢 Terminado</button>
+    </div>
+    <div class="lista-reportes" id="lista"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ==================== CONFIG ====================
+const SHEET_ID = '17ZAvOQE2Vw7sf4OSI9C59fYcx8hdU1-k_s7sBLpVjtg';
+const URL_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Hoja1`;
+
+let SCRIPT_URL = localStorage.getItem('eco_script_url') || '';
+let COL_ESTADO = localStorage.getItem('eco_col_estado') || 'estado';
+let COL_ID = localStorage.getItem('eco_col_id') || 'id';
+let modoLectura = !SCRIPT_URL;
+
+let mapa, reportes = [], markers = [], filtroActual = 'todos';
+
+// ==================== FUNCIONES ====================
+function abrirConfig() { /* igual que antes */ 
+  document.getElementById('modal-config').style.display = 'flex';
+  if (SCRIPT_URL) document.getElementById('input-script-url').value = SCRIPT_URL;
+  document.getElementById('input-col-estado').value = COL_ESTADO;
+  document.getElementById('input-col-id').value = COL_ID;
+}
+
+function guardarConfig() {
+  const url = document.getElementById('input-script-url').value.trim();
+  if (!url) return mostrarToast('Ingresa la URL del Apps Script', 'error');
+
+  SCRIPT_URL = url;
+  COL_ESTADO = document.getElementById('input-col-estado').value.trim() || 'estado';
+  COL_ID = document.getElementById('input-col-id').value.trim() || 'id';
+  
+  localStorage.setItem('eco_script_url', SCRIPT_URL);
+  localStorage.setItem('eco_col_estado', COL_ESTADO);
+  localStorage.setItem('eco_col_id', COL_ID);
+  
+  modoLectura = false;
+  document.getElementById('modal-config').style.display = 'none';
+  actualizarModoBadge();
+  mostrarToast('✅ Escritura activada', 'ok');
+  cargarDatos();
+}
+
+// ==================== ACTUALIZAR ESTADO (MEJORADO) ====================
+async function actualizarEstado(reporte, nuevoEstado, btnI, btnF) {
+  if (modoLectura) {
+    mostrarToast('⚠️ Activa la escritura en Config', 'error');
+    return;
+  }
+
+  btnI.classList.add('cargando');
+  btnF.classList.add('cargando');
+  const origI = btnI.textContent;
+  const origF = btnF.textContent;
+
+  try {
+    const rowId = (COL_ID !== 'id' && reporte[COL_ID]) ? reporte[COL_ID] : reporte._rowIndex;
+
+    const params = new URLSearchParams({
+      action: "updateEstado",
+      rowId: rowId,
+      colId: COL_ID,
+      colEstado: COL_ESTADO,
+      estado: nuevoEstado
+    });
+
+    const res = await fetch(`${SCRIPT_URL}?${params}`);
+    const data = await res.json();
+
+    if (data.success) {
+      reporte[COL_ESTADO.toLowerCase()] = nuevoEstado; // actualizamos en memoria
+      mostrarToast(nuevoEstado === 'Pendiente' ? '⏳ Iniciado' : '✅ Finalizado', 'ok');
+      renderLista(reportesFiltrados());
+      renderMapa(reportesFiltrados());
+    } else {
+      throw new Error(data.error || 'Error del servidor');
+    }
+  } catch (err) {
+    console.error(err);
+    mostrarToast(`❌ ${err.message}`, 'error');
+  } finally {
+    btnI.classList.remove('cargando');
+    btnF.classList.remove('cargando');
+    btnI.textContent = origI;
+    btnF.textContent = origF;
+  }
+}
+
+// Resto de tu código (parsearCSV, renderLista, etc.) se mantiene casi igual
+// ... (el resto de tu script)
+
+cargarDatos();
+</script>
+</body>
+</html>
